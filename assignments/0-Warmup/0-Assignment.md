@@ -18,10 +18,13 @@ Please provide answers to these questions using markdown notation and place them
 
 
 3. Please provide a link to the repository you are using for this class.
+
 https://github.com/Sunny7765/SysProg-Class.git
 
 4. Briefly describe what you want to get out of this class.
+
 I want to be able to learn skills that will help me in my future career
 
 5. Briefly describe any concerns you might be having with being successful in this class (if any).
+
 I have a lot of back to back classes including this one. So I hope I'll be able to manage all of them efficiently.
