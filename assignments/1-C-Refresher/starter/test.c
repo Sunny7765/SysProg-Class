@@ -192,7 +192,7 @@ int main(int argc, char *argv[]){
     //WE NOW WILL HANDLE THE REQUIRED OPERATIONS
 
     //TODO:  #2 Document the purpose of the if statement below
-    //      This checks if at lest 3 arguments are given. If a flag and a string is given, then the program will run. If not, the program will exit.
+    //      PLACE A COMMENT BLOCK HERE EXPLAINING
     if (argc < 3){
         usage(argv[0]);
         exit(1);
@@ -205,10 +205,15 @@ int main(int argc, char *argv[]){
     //          return code of 99
     // CODE GOES HERE FOR #3
     buff = malloc(BUFFER_SZ * sizeof(char));
+    if (buff == NULL) {
+        printf("Error: Failed to allocate memory for buffer.\n");
+        exit(99);
+    }
 
     user_str_len = setup_buff(buff, input_string, BUFFER_SZ);     //see todos
     if (user_str_len < 0){
-        printf("Error setting up buffer, error = %d", user_str_len);
+        printf("Error setting up buffer, error = %d\n", user_str_len);
+        free(buff);
         exit(2);
     }
 
@@ -216,7 +221,8 @@ int main(int argc, char *argv[]){
         case 'c':
             rc = count_words(buff, BUFFER_SZ, user_str_len);  //you need to implement
             if (rc < 0){
-                printf("Error counting words, rc = %d", rc);
+                printf("Error counting words, rc = %d\n", rc);
+                free(buff);
                 exit(2);
             }
 
@@ -238,13 +244,20 @@ int main(int argc, char *argv[]){
         case 'x':
             if (argc < 5) {
                 usage(argv[0]);
+                free(buff);
                 exit(1);
             }
-            search_replace(buff, BUFFER_SZ, user_str_len, argv[3], argv[4]);
+            rc = search_replace(buff, BUFFER_SZ, user_str_len, argv[3], argv[4]);
+            if (rc == -1) {
+                printf("Error setting up buffer, error = -1\n");
+                free(buff);
+                exit(2);
+            }
             break;
 
         default:
             usage(argv[0]);
+            free(buff);
             exit(1);
     }
 
@@ -260,4 +273,4 @@ int main(int argc, char *argv[]){
 //          is a good practice, after all we know from main() that 
 //          the buff variable will have exactly 50 bytes?
 //  
-//          I think it is a good practice because it allows the function to used with any buffer of any length. It makes the function more flexible. Even if the buffer size changes, the function will still work.
+//          PLACE YOUR ANSWER HERE
