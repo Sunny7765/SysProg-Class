@@ -451,8 +451,66 @@ void print_student(student_t *s)
  */
 int compress_db(int fd)
 {
-    // TODO
-    printf(M_NOT_IMPL);
+    int temp_fd;
+    student_t student;
+    ssize_t bytes_read;
+    ssize_t bytes_written;
+
+    temp_fd = open_db(TMP_DB_FILE, true);
+    if (temp_fd < 0)
+    {
+        printf(M_ERR_DB_OPEN);
+        return ERR_DB_FILE;
+    }
+
+    if (lseek(fd, 0, SEEK_SET) < 0)
+    {
+        printf(M_ERR_DB_READ);
+        close(temp_fd);
+        return ERR_DB_FILE;
+    }
+
+    while ((bytes_read = read(fd, &student, STUDENT_RECORD_SIZE)) > 0)
+    {
+        student_t empty_student = {0};
+        if (memcmp(&student, &empty_student, STUDENT_RECORD_SIZE) == 0)
+        {
+            continue;
+        }
+
+        bytes_written = write(temp_fd, &student, STUDENT_RECORD_SIZE);
+        if (bytes_written < 0)
+        {
+            printf(M_ERR_DB_WRITE);
+            close(temp_fd);
+            return ERR_DB_FILE;
+        }
+    }
+
+    if (bytes_read < 0)
+    {
+        printf(M_ERR_DB_READ);
+        close(temp_fd);
+        return ERR_DB_FILE;
+    }
+
+    close(fd);
+
+    if (rename(TMP_DB_FILE, DB_FILE) < 0)
+    {
+        printf(M_ERR_DB_CREATE);
+        close(temp_fd);
+        return ERR_DB_FILE;
+    }
+
+    fd = open_db(DB_FILE, false);
+    if (fd < 0)
+    {
+        printf(M_ERR_DB_OPEN);
+        return ERR_DB_FILE;
+    }
+
+    printf(M_DB_COMPRESSED_OK);
     return fd;
 }
 
