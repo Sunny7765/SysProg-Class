@@ -46,7 +46,13 @@ int count_words(char *str){
     bool word_start;
 
     // Please implement
-    return 0;
+    if (word_start) {
+        wc = false;
+    }
+
+    for (int i = 0; i < len; i++) {
+        str[i]
+    }
 }
 
 //reverse_string() algorithm
