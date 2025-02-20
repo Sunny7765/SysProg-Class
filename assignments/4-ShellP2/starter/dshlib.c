@@ -140,7 +140,7 @@ int exec_local_cmd_loop()
 
         if (strcmp(cmd_buff.argv[0], "cd") == 0) {
             if (cmd_buff.argc == 1) {
-                chdir(getenv("HOME"));
+                chdir(getenv("tmp"));
             } else {
                 if (chdir(cmd_buff.argv[1]) != 0) {
                     perror("chdir failed");

@@ -20,22 +20,22 @@
 
 6. Describe how your implementation of build_cmd_buff() handles quoted arguments. Why is this necessary?
 
-    > **Answer**:  My implementation 
+    > **Answer**:  My implementation handles it by handling quoted arguments as a single argument so that the spaces within are preserved. This is necessary because it allows quoted arguments to be treated as a single unit as it would be registered as multiple otherwise.
 
 7. What changes did you make to your parsing logic compared to the previous assignment? Were there any unexpected challenges in refactoring your old code?
 
-    > **Answer**:  _start here_
+    > **Answer**:  Yes, it was really challenging trying to just switch it from accepting a command line to using cmd_buff instead. But I had to figure our how to not parse the spaces in the middle of the argument like for hello,       world. 
 
 8. For this quesiton, you need to do some research on Linux signals. You can use [this google search](https://www.google.com/search?q=Linux+signals+overview+site%3Aman7.org+OR+site%3Alinux.die.net+OR+site%3Atldp.org&oq=Linux+signals+overview+site%3Aman7.org+OR+site%3Alinux.die.net+OR+site%3Atldp.org&gs_lcrp=EgZjaHJvbWUyBggAEEUYOdIBBzc2MGowajeoAgCwAgA&sourceid=chrome&ie=UTF-8) to get started.
 
 - What is the purpose of signals in a Linux system, and how do they differ from other forms of interprocess communication (IPC)?
 
-    > **Answer**:  _start here_
+    > **Answer**: Signals communicate process events between the kernel and processes. Unlike IPCs, signals are used for controlling processes and not for communication.
 
 - Find and describe three commonly used signals (e.g., SIGKILL, SIGTERM, SIGINT). What are their typical use cases?
 
-    > **Answer**:  _start here_
+    > **Answer**:  SIGKILL forcefully terminates a process. SIGTERM gives the process an opportunity to cleanup operations before exiting. SIGINT interrupts the running process.
 
 - What happens when a process receives SIGSTOP? Can it be caught or ignored like SIGINT? Why or why not?
 
-    > **Answer**:  _start here_
+    > **Answer**:  The process pauses until it receives a continue signal. It can't be ignored because it is used for debugging and process control. 
