@@ -1,6 +1,11 @@
 {
     "files.associations": {
         "unistd.h": "c",
-        "syscall.h": "c"
+        "syscall.h": "c",
+        "errno.h": "c",
+        "fcntl.h": "c",
+        "ctype.h": "c",
+        "string.h": "c",
+        "dshlib.h": "c"
     }
 }
