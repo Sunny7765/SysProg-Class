@@ -6,7 +6,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/wait.h>
+#include <errno.h>
 #include "dshlib.h"
+
 
 void parse_input(cmd_buff_t *cmd_buff) {
     cmd_buff->argc = 0;
@@ -95,6 +97,8 @@ void parse_input(cmd_buff_t *cmd_buff) {
  *      fork(), execvp(), exit(), chdir()
  */
 
+int last_return_code = 0;
+
 int exec_local_cmd_loop()
 {
     cmd_buff_t cmd_buff;
@@ -140,6 +144,9 @@ int exec_local_cmd_loop()
             } else {
                 if (chdir(cmd_buff.argv[1]) != 0) {
                     perror("chdir failed");
+                    last_return_code = errno;
+                } else {
+                    last_return_code = 0;
                 }
             }
             continue;
@@ -149,12 +156,19 @@ int exec_local_cmd_loop()
         if (pid == 0) {
            execvp(cmd_buff.argv[0], cmd_buff.argv);
            perror("exec failure");
-           exit(1);
+           exit(errno);
         } else {
-            wait(NULL);
+            int status;
+            wait(&status);
+            if (WIFEXITED(status)) {
+                last_return_code = WEXITSTATUS(status);
+                if (last_return_code != 0) {
+                    printf(CMD_ERR_EXECUTE);
+                }
+            }
         }
     }
-
+    
     free(cmd_buff._cmd_buffer);
     return OK;
 }

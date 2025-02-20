@@ -1,26 +1,26 @@
 1. Can you think of why we use `fork/execvp` instead of just calling `execvp` directly? What value do you think the `fork` provides?
 
-    > **Answer**:  _start here_
+    > **Answer**: Because fork creates a new process, which lets the shell perform actions before and after the command execution. Just using execvp would not create a new process and not be able to run the lines that we have written.
 
 2. What happens if the fork() system call fails? How does your implementation handle this scenario?
 
-    > **Answer**:  _start here_
+    > **Answer**:  It means that fork() did not create a new. My implementation exits the program.
 
 3. How does execvp() find the command to execute? What system environment variable plays a role in this process?
 
-    > **Answer**:  _start here_
+    > **Answer**:  It finds the path environment variable to find the command.
 
 4. What is the purpose of calling wait() in the parent process after forking? What would happen if we didn’t call it?
 
-    > **Answer**:  _start here_
+    > **Answer**:  It is to stop the new processes from becoming a zombie process where the resources inside it cannot be accessed. If wait is not called, the process will stay in the system and use unnecessary resources. 
 
 5. In the referenced demo code we used WEXITSTATUS(). What information does this provide, and why is it important?
 
-    > **Answer**:  _start here_
+    > **Answer**:  It extracts the exit status of a new process which can help us determine if it ran correctly.
 
 6. Describe how your implementation of build_cmd_buff() handles quoted arguments. Why is this necessary?
 
-    > **Answer**:  _start here_
+    > **Answer**:  My implementation 
 
 7. What changes did you make to your parsing logic compared to the previous assignment? Were there any unexpected challenges in refactoring your old code?
 
