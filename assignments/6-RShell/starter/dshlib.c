@@ -6,15 +6,52 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/wait.h>
-
+#include <errno.h>
 #include "dshlib.h"
 
-/**** 
- **** FOR REMOTE SHELL USE YOUR SOLUTION FROM SHELL PART 3 HERE
- **** THE MAIN FUNCTION CALLS THIS ONE AS ITS ENTRY POINT TO
- **** EXECUTE THE SHELL LOCALLY
- ****
- */
+
+void parse_input(cmd_buff_t *cmd_buff) {
+    cmd_buff->argc = 0;
+    char *input = cmd_buff->_cmd_buffer;
+    bool in_word = false;
+    
+    while (*input) {
+        while (isspace(*input)) {
+            *input++ = '\0';
+        }
+        
+        if (*input == '\0') {
+            break;
+        }
+
+        if (*input == '"') {
+            in_word = true;
+            input++;
+        }
+
+        cmd_buff->argv[cmd_buff->argc++] = input;
+
+        while (*input) {
+            if (in_word) {
+                if (*input == '"') {
+                    *input = '\0';
+                    input++;
+                    break;
+                }
+            } else {
+                if (isspace(*input)) {
+                    *input = '\0';
+                    input++;
+                    break;
+                }
+            }
+            input++;
+        }
+        in_word = false;
+    }
+    cmd_buff->argv[cmd_buff->argc] = NULL;
+}
+
 
 /*
  * Implement your exec_local_cmd_loop function by building a loop that prompts the 
@@ -59,46 +96,105 @@
  *  Standard Library Functions You Might Want To Consider Using (assignment 2+)
  *      fork(), execvp(), exit(), chdir()
  */
-void parse_input(cmd_buff_t *cmd_buff) {
-    cmd_buff->argc = 0;
-    char *input = cmd_buff->_cmd_buffer;
-    bool in_word = false;
+
+int last_return_code = 0;
+
+int exec_local_cmd_loop() {
+    cmd_buff_t cmd_buff;
+    command_list_t clist;
+    int parse_result;
+    Built_In_Cmds bi_cmd;
+
+    cmd_buff._cmd_buffer = (char *)malloc(SH_CMD_MAX);
+    if (cmd_buff._cmd_buffer == NULL) {
+        return ERR_MEMORY;
+    }
     
-    while (*input) {
-        while (isspace(*input)) {
-            *input++ = '\0';
-        }
-        
-        if (*input == '\0') {
+    // TODO IMPLEMENT MAIN LOOP
+
+    // TODO IMPLEMENT parsing input to cmd_buff_t *cmd_buff
+
+    // TODO IMPLEMENT if built-in command, execute builtin logic for exit, cd (extra credit: dragon)
+    // the cd command should chdir to the provided directory; if no directory is provided, do nothing
+
+    // TODO IMPLEMENT if not built-in command, fork/exec as an external command
+    // for example, if the user input is "ls -l", you would fork/exec the command "ls" with the arg "-l"
+    
+    cmd_buff.argc = 0;
+    while (1) {
+        printf("%s", SH_PROMPT);
+        if (fgets(cmd_buff._cmd_buffer, SH_CMD_MAX, stdin) == NULL) 
+        {
+            printf("\n");
             break;
         }
 
-        if (*input == '"') {
-            in_word = true;
-            input++;
+        cmd_buff._cmd_buffer[strcspn(cmd_buff._cmd_buffer, "\n")] = '\0';
+        parse_result = build_cmd_list(cmd_buff._cmd_buffer, &clist);
+        
+        if (parse_result != OK) {
+            if (parse_result == WARN_NO_CMDS) {
+                printf(CMD_WARN_NO_CMD);
+            } else if (parse_result == ERR_TOO_MANY_COMMANDS)
+            {
+                fprintf(stderr, CMD_ERR_PIPE_LIMIT, CMD_MAX);
+            }
+            continue;
         }
 
-        cmd_buff->argv[cmd_buff->argc++] = input;
+        if (clist.num == 0) {
+            printf(CMD_WARN_NO_CMD);
+            continue;
+        }
 
-        while (*input) {
-            if (in_word) {
-                if (*input == '"') {
-                    *input = '\0';
-                    input++;
-                    break;
-                }
-            } else {
-                if (isspace(*input)) {
-                    *input = '\0';
-                    input++;
-                    break;
+        bi_cmd = match_command(clist.commands[0].argv[0]);
+
+        if (bi_cmd != BI_NOT_BI) {
+            if (bi_cmd == BI_CMD_EXIT) {
+                printf("exiting...\n");
+                break;
+            } else if (bi_cmd == BI_CMD_CD) {
+                if (clist.commands[0].argc == 1) {
+                    chdir(getenv("HOME"));
+                } else {
+                    if (chdir(clist.commands[0].argv[1]) != 0) {
+                        perror("chdir failed");
+                        last_return_code = errno;
+                    } else {
+                        last_return_code = 0;
+                    }
                 }
             }
-            input++;
+            else if (bi_cmd != BI_NOT_BI && bi_cmd != BI_CMD_EXIT && bi_cmd != BI_CMD_CD) {
+                exec_built_in_cmd(&clist.commands[0]);
+            }
+
+        } else {
+            last_return_code = execute_pipeline(&clist);
+            if (last_return_code != OK) {
+                printf(CMD_ERR_EXECUTE);
+            }
         }
-        in_word = false;
     }
-    cmd_buff->argv[cmd_buff->argc] = NULL;
+
+    free(cmd_buff._cmd_buffer);
+    return OK;
+}
+
+Built_In_Cmds match_command(const char *input) {
+    if (input == NULL) return BI_NOT_BI;
+    if (strcmp(input, EXIT_CMD) == 0) {
+        return BI_CMD_EXIT;
+    } else if (strcmp(input, "cd") == 0) {
+        return BI_CMD_CD;
+    }
+    else {
+        return BI_NOT_BI;
+    }
+}
+
+Built_In_Cmds exec_built_in_cmd(cmd_buff_t *cmd) {
+    return BI_EXECUTED; 
 }
 
 int build_cmd_list(char *cmd_line, command_list_t *clist) {
@@ -111,244 +207,115 @@ int build_cmd_list(char *cmd_line, command_list_t *clist) {
     if (original_line == NULL) {
         return ERR_CMD_OR_ARGS_TOO_BIG;
     }
-
     char *trimmed_line = original_line;
-    while (*trimmed_line == ' ') trimmed_line++; // 
-
     size_t len = strlen(trimmed_line);
     while (len > 0 && trimmed_line[len - 1] == ' ') {
-        trimmed_line[--len] = '\0'; 
+        trimmed_line[--len] = '\0';
     }
 
-    if (*trimmed_line == '\0') {
-        printf(CMD_WARN_NO_CMD);
-        free(original_line);
-        return WARN_NO_CMDS;
-    }
 
-    int command_count = 0;
-    char *saveptr1, *saveptr2;
-    char *command = strtok_r(trimmed_line, PIPE_STRING, &saveptr1);
+    clist->num = 0;
+    char *command_segment;
+    char *remaining_input = trimmed_line;
 
-    while (command != NULL && command_count < CMD_MAX) {
-        cmd_buff_t *cmd_buff = &clist->commands[command_count];
-        memset(cmd_buff, 0, sizeof(cmd_buff_t));
-
-        int arg_index = 0;
-        char *arg = strtok_r(command, " ", &saveptr2);
-
-        while (arg != NULL && arg_index < CMD_ARGV_MAX - 1) {
-            cmd_buff->argv[arg_index] = strdup(arg);
-            if (cmd_buff->argv[arg_index] == NULL) {
-                free(original_line);
-                return ERR_CMD_OR_ARGS_TOO_BIG; 
-            }
-            arg_index++;
-            arg = strtok_r(NULL, " ", &saveptr2);
-        }
-
-        cmd_buff->argv[arg_index] = NULL;
-        cmd_buff->argc = arg_index;
-
-        command_count++;
-        command = strtok_r(NULL, PIPE_STRING, &saveptr1);
-    }
-
-    if (command != NULL) {
-        free(original_line);
-        return ERR_TOO_MANY_COMMANDS;
-    }
-
-    clist->num = command_count;
-    free(original_line);
-    return OK;
-}
-
-int execute_cmd_list(command_list_t *clist) {
-    if (clist->num == 0) {
-        return WARN_NO_CMDS;
-    }
-
-    int last_return_code = 0;  // Track return code for command execution
-
-    // Handle single command execution
-    if (clist->num == 1) {
-        cmd_buff_t cmd_buff;
-        cmd_buff._cmd_buffer = (char *)malloc(SH_CMD_MAX);
-        if (cmd_buff._cmd_buffer == NULL) {
-            return ERR_MEMORY;
-        }
-
-        // Prepare command buffer with executable and arguments
-        snprintf(cmd_buff._cmd_buffer, SH_CMD_MAX, "%s %s",
-                 clist->commands[0].exe, clist->commands[0].args);
-
-        parse_input(&cmd_buff);
-
-        if (cmd_buff.argc == 0) {
-            free(cmd_buff._cmd_buffer);
-            return WARN_NO_CMDS;
-        }
-
-        // Handle built-in "cd" command
-        if (strcmp(cmd_buff.argv[0], "cd") == 0) {
-            if (cmd_buff.argc == 1) {
-                chdir(getenv("HOME"));
-            } else {
-                if (chdir(cmd_buff.argv[1]) != 0) {
-                    perror("chdir failed");
-                    last_return_code = errno;
-                } else {
-                    last_return_code = 0;
-                }
-            }
-            free(cmd_buff._cmd_buffer);
-            return OK;
-        }
-
-        // Fork and execute external command
-        pid_t pid = fork();
-        if (pid == 0) {
-            execvp(cmd_buff.argv[0], cmd_buff.argv);
-            perror("exec failure");
-            exit(errno);
-        } else {
-            int status;
-            wait(&status);
-            if (WIFEXITED(status)) {
-                last_return_code = WEXITSTATUS(status);
-                if (last_return_code != 0) {
-                    printf(CMD_ERR_EXECUTE);
-                }
-            }
-        }
-        free(cmd_buff._cmd_buffer);
-        return OK;
-    } else {
-        // Handle multiple commands with pipes
-        int pipes[clist->num - 1][2];
-
-        // Create pipes for command chaining
-        for (int i = 0; i < clist->num - 1; i++) {
-            if (pipe(pipes[i]) == -1) {
-                perror("pipe");
-                return ERR_MEMORY;
-            }
-        }
-
-        for (int i = 0; i < clist->num; i++) {
-            pid_t pid = fork();
-            if (pid == 0) {  // Child process
-                // Set up stdin/stdout for pipe redirection
-                if (i > 0) {
-                    dup2(pipes[i - 1][0], STDIN_FILENO);  // Read from previous pipe
-                }
-                if (i < clist->num - 1) {
-                    dup2(pipes[i][1], STDOUT_FILENO);  // Write to current pipe
-                }
-
-                // Close all pipes in child process
-                for (int j = 0; j < clist->num - 1; j++) {
-                    close(pipes[j][0]);
-                    close(pipes[j][1]);
-                }
-
-                // Prepare command buffer
-                cmd_buff_t cmd_buff;
-                cmd_buff._cmd_buffer = (char *)malloc(SH_CMD_MAX);
-                if (cmd_buff._cmd_buffer == NULL) {
-                    exit(ERR_MEMORY);
-                }
-
-                snprintf(cmd_buff._cmd_buffer, SH_CMD_MAX, "%s %s",
-                         clist->commands[i].exe, clist->commands[i].args);
-
-                parse_input(&cmd_buff);
-
-                // Execute the command
-                execvp(cmd_buff.argv[0], cmd_buff.argv);
-                perror("exec failure");
-                exit(errno);
-            } else if (pid < 0) {
-                perror("fork");
-                return ERR_MEMORY;
-            }
-        }
-
-        // Parent process: close pipes and wait for all children
-        for (int i = 0; i < clist->num - 1; i++) {
-            close(pipes[i][0]);
-            close(pipes[i][1]);
-        }
-
-        // Wait for child processes to finish
-        int status;
-        for (int i = 0; i < clist->num; i++) {
-            wait(&status);
-            if (WIFEXITED(status)) {
-                if (WEXITSTATUS(status) != 0) {
-                    printf(CMD_ERR_EXECUTE);
-                }
-            }
-        }
-    }
-
-    return OK;
-}
-
-int exec_local_cmd_loop() {
-    char cmd_buff[SH_CMD_MAX];
-command_list_t clist;
-    int rc;
-
-    while (1) {
-        printf("%s", SH_PROMPT);
-        if (fgets(cmd_buff, SH_CMD_MAX, stdin) == NULL) {
-            printf("\n");
-            break;
-        }
-
-        cmd_buff[strcspn(cmd_buff, "\n")] = '\0';
-
-        char *trimmed_cmd = cmd_buff;
-        while (*trimmed_cmd == ' ') trimmed_cmd++;
-        size_t len = strlen(trimmed_cmd);
-        while (len > 0 && trimmed_cmd[len - 1] == ' ') {
-            trimmed_cmd[--len] = '\0';
-        }
-
-        if (*trimmed_cmd == '\0') {
-            printf(CMD_WARN_NO_CMD);
+    while ((command_segment = strsep(&remaining_input, PIPE_STRING)) != NULL) {
+        if (strlen(command_segment) == 0) {
             continue;
         }
-
-        if (strcmp(trimmed_cmd, EXIT_CMD) == 0) {
-            break;
+        
+        if (clist->num >= CMD_MAX) {
+            fprintf(stderr, CMD_ERR_PIPE_LIMIT, CMD_MAX);
+            free(original_line);
+            return ERR_TOO_MANY_COMMANDS;
         }
 
-        rc = build_cmd_list(trimmed_cmd, &clist);
+        cmd_buff_t *current_cmd_buff = &(clist->commands[clist->num]);
 
-        switch (rc) {
-            case OK:
-                rc = execute_cmd_list(&clist);
-                if (rc != OK) {
-                    printf(CMD_ERR_EXECUTE);
-                }
-                break;
-            case WARN_NO_CMDS:
-                printf(CMD_WARN_NO_CMD);
-                break;
-            case ERR_TOO_MANY_COMMANDS:
-                printf(CMD_ERR_PIPE_LIMIT);
-                break;
-            case ERR_MEMORY:
-                printf("Memory allocation error\n");
-                break;
-            default:
-                printf("Unknown error\n");
-                break;
+        current_cmd_buff->_cmd_buffer = (char *)malloc(SH_CMD_MAX);
+        if (current_cmd_buff->_cmd_buffer == NULL) {
+            free(original_line); 
+            return ERR_MEMORY;
+        }
+        memset(current_cmd_buff->_cmd_buffer, 0, SH_CMD_MAX);
+
+        strcpy(current_cmd_buff->_cmd_buffer, command_segment);
+
+        parse_input(current_cmd_buff);
+
+        clist->num++;
+    }
+
+    free(original_line); 
+    return OK;
+}
+
+//Refactored from Professor Brian Mitchell's Demos
+int execute_pipeline(command_list_t *clist) {
+    if (clist->num == 0) {
+        return OK;
+    }
+
+    int pipes[CMD_MAX - 1][2];  // Array of pipes
+    pid_t pids[CMD_MAX];        // Array to store process IDs
+
+    // Create all necessary pipes
+    for (int i = 0; i < clist->num - 1; i++) {
+        if (pipe(pipes[i]) == -1) {
+            perror("pipe");
+            return ERR_EXEC_CMD;
         }
     }
 
-    return OK;
+    // Create processes for each command
+    for (int i = 0; i < clist->num; i++) {
+        pids[i] = fork();
+        if (pids[i] == -1) {
+            perror("fork");
+            return ERR_EXEC_CMD;
+        }
+
+        if (pids[i] == 0) {  // Child process
+            // Set up input pipe for all except first process
+            if (i > 0) {
+                dup2(pipes[i-1][0], STDIN_FILENO);
+            }
+
+            // Set up output pipe for all except last process
+            if (i < clist->num - 1) {
+                dup2(pipes[i][1], STDOUT_FILENO);
+            }
+
+            // Close all pipe ends in child
+            for (int j = 0; j < clist->num - 1; j++) {
+                close(pipes[j][0]);
+                close(pipes[j][1]);
+            }
+
+            // Execute command
+            execvp(clist->commands[i].argv[0], clist->commands[i].argv);
+            perror("execvp");
+            exit(ERR_EXEC_CMD);
+        }
+    }
+
+    // Parent process: close all pipe ends
+    for (int i = 0; i < clist->num - 1; i++) {
+        close(pipes[i][0]);
+        close(pipes[i][1]);
+    }
+
+    // Wait for all children
+    int status;
+    int last_command_exit_status = OK;
+    for (int i = 0; i < clist->num; i++) {
+        if (waitpid(pids[i], &status, 0) == -1) {
+            perror("waitpid");
+            last_command_exit_status = ERR_EXEC_CMD;
+        } else {
+            if (WIFEXITED(status)) {
+                last_command_exit_status = WEXITSTATUS(status);
+            }
+        }
+    }
+    return last_command_exit_status;
 }
